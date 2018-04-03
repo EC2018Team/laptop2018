@@ -1,3 +1,4 @@
+###################### OSX ########################
 .DS_Store
 
 # install module
@@ -12,4 +13,27 @@ admin/config.php
 .jshintrc
 
 
-# And more ...
+###################### WINDOWS #####################
+
+## Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+## Folder config file
+Desktop.ini
+
+## Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+## Windows Installer files
+*.cab
+*.msi
+*.msm
+*.msp
+
+# There are .gitignore in:
+#                         system/storage/cache
+#                         system/storage/logs
+#                         system/storage/session
+#                         system/storage/upload
+#                         image/cache
