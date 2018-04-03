@@ -1,0 +1,15 @@
+.DS_Store
+
+# install module
+install/
+
+# config file
+config.php
+admin/config.php
+
+# IDEs
+/.idea/
+.jshintrc
+
+
+# And more ...
