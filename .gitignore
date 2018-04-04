@@ -5,7 +5,7 @@
 install/
 
 # config file
-config.php
+/config.php
 admin/config.php
 
 # IDEs
