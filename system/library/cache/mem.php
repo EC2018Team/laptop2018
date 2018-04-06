@@ -2,26 +2,24 @@
 namespace Cache;
 class Mem {
 	private $expire;
-	private $memcache;
-	
-	const CACHEDUMP_LIMIT = 9999;
+	private $cache;
 
 	public function __construct($expire) {
 		$this->expire = $expire;
 
-		$this->memcache = new \Memcache();
-		$this->memcache->pconnect(CACHE_HOSTNAME, CACHE_PORT);
+		$this->cache = new \Memcache();
+		$this->cache->pconnect(CACHE_HOSTNAME, CACHE_PORT);
 	}
 
 	public function get($key) {
-		return $this->memcache->get(CACHE_PREFIX . $key);
+		return $this->cache->get(CACHE_PREFIX . $key);
 	}
 
-	public function set($key, $value) {
-		return $this->memcache->set(CACHE_PREFIX . $key, $value, MEMCACHE_COMPRESSED, $this->expire);
+	public function set($key,$value) {
+		return $this->cache->set(CACHE_PREFIX . $key, $value, MEMCACHE_COMPRESSED, $this->expire);
 	}
 
 	public function delete($key) {
-		$this->memcache->delete(CACHE_PREFIX . $key);
+		$this->cache->delete(CACHE_PREFIX . $key);
 	}
 }

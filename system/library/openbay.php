@@ -3,23 +3,18 @@ final class Openbay {
 	private $registry;
 	private $installed_modules = array();
 	public $installed_markets = array();
-	private $logging = 1;
 
 	public function __construct($registry) {
-		// OpenBay Pro
 		$this->registry = $registry;
 
-		if ($this->db != null) {
-			$this->getInstalled();
+		$this->getInstalled();
 
-			foreach ($this->installed_markets as $market) {
-				$class = '\openbay\\'. ucfirst($market);
-
-				$this->{$market} = new $class($registry);
-			}
+		foreach ($this->installed_markets as $market) {
+			$class = ucfirst($market);
+			$this->{$market} = new $class($registry);
 		}
 
-		$this->logger = new \Log('openbay.log');
+		$this->logger = new Log('openbay.log');
 	}
 
 	public function __get($name) {
@@ -39,22 +34,82 @@ final class Openbay {
 		}
 	}
 
-	public function encrypt($value, $key, $iv, $json = true) {
-		if ($json == true) {
-		    $value = json_encode($value);
-        }
+	public function encrypt($msg, $k, $base64 = false) {
+		$td = mcrypt_module_open('rijndael-256', '', 'ctr', '');
 
-	    return strtr(base64_encode(openssl_encrypt($value, 'aes-128-cbc', hash('sha256', hex2bin($key), true), 0, hex2bin($iv))), '+/=', '-_,');
+		if (!$td) {
+			return false;
+		}
+
+		$iv = mcrypt_create_iv(32, MCRYPT_RAND);
+
+		if (mcrypt_generic_init($td, $k, $iv) !== 0) {
+			return false;
+		}
+
+		$msg = mcrypt_generic($td, $msg);
+		$msg = $iv . $msg;
+		$mac = $this->pbkdf2($msg, $k, 1000, 32);
+		$msg .= $mac;
+
+		mcrypt_generic_deinit($td);
+		mcrypt_module_close($td);
+
+		if ($base64) {
+			$msg = base64_encode($msg);
+		}
+
+		return $msg;
 	}
 
-	public function decrypt($value, $key, $iv, $json = true) {
-		$response = trim(openssl_decrypt(base64_decode(strtr($value, '-_,', '+/=')), 'aes-128-cbc', hash('sha256', hex2bin($key), true), 0, hex2bin($iv)));
+	public function decrypt($msg, $k, $base64 = false) {
+		if ($base64) {
+			$msg = base64_decode($msg);
+		}
 
-		if ($json == true) {
-		    $response =  json_decode($response, true);
-        }
+		if (!$td = mcrypt_module_open('rijndael-256', '', 'ctr', '')) {
+			return false;
+		}
 
-        return $response;
+		$iv = substr($msg, 0, 32);
+		$mo = strlen($msg) - 32;
+		$em = substr($msg, $mo);
+		$msg = substr($msg, 32, strlen($msg) - 64);
+		$mac = $this->pbkdf2($iv . $msg, $k, 1000, 32);
+
+		if ($em !== $mac) {
+			return false;
+		}
+
+		if (mcrypt_generic_init($td, $k, $iv) !== 0) {
+			return false;
+		}
+
+		$msg = mdecrypt_generic($td, $msg);
+		$msg = unserialize($msg);
+
+		mcrypt_generic_deinit($td);
+		mcrypt_module_close($td);
+
+		return $msg;
+	}
+
+	public function pbkdf2($p, $s, $c, $kl, $a = 'sha256') {
+		$hl = strlen(hash($a, null, true));
+		$kb = ceil($kl / $hl);
+		$dk = '';
+
+		for ($block = 1; $block <= $kb; $block++) {
+
+			$ib = $b = hash_hmac($a, $s . pack('N', $block), $p, true);
+
+			for ($i = 1; $i < $c; $i++)
+				$ib ^= ($b = hash_hmac($a, $b, $p, true));
+
+			$dk .= $ib;
+		}
+
+		return substr($dk, 0, $kl);
 	}
 
 	private function getInstalled() {
@@ -79,7 +134,7 @@ final class Openbay {
 		 */
 
 		foreach ($this->installed_markets as $market) {
-			if ($this->config->get($market . '_status') == 1 || $this->config->get('openbay_' .$market . '_status') == 1) {
+			if ($this->config->get($market . '_status') == 1) {
 				$this->{$market}->putStockUpdateBulk($product_id_array, $end_inactive);
 			}
 		}
@@ -89,7 +144,7 @@ final class Openbay {
 		$res = $this->db->query("SHOW COLUMNS FROM `" . DB_PREFIX . $table . "` LIKE '" . $column . "'");
 		if($res->num_rows != 0) {
 			return true;
-		} else {
+		}else{
 			return false;
 		}
 	}
@@ -105,7 +160,7 @@ final class Openbay {
 
 		if(in_array($table, $tables)) {
 			return true;
-		} else {
+		}else{
 			return false;
 		}
 	}
@@ -173,7 +228,7 @@ final class Openbay {
 
 		if($query->num_rows > 0) {
 			return $query->row['zone_id'];
-		} else {
+		}else{
 			return 0;
 		}
 	}
@@ -182,14 +237,8 @@ final class Openbay {
 		$this->load->model('checkout/order');
 		$order_info = $this->model_checkout_order->getOrder($order_id);
 
-		if (version_compare(VERSION, '2.2', '>') == true) {
-			$language_code = $order_info['language_code'];
-		} else {
-			$language_code = $order_info['language_directory'];
-		}
-
-		$language = new Language($language_code);
-		$language->load($language_code);
+		$language = new Language($order_info['language_directory']);
+		$language->load('default');
 		$language->load('mail/order');
 
 		$order_status = $this->db->query("SELECT `name` FROM " . DB_PREFIX . "order_status WHERE order_status_id = '" . (int)$order_status_id . "' AND language_id = '" . (int)$this->config->get('config_language_id') . "' LIMIT 1")->row['name'];
@@ -225,7 +274,7 @@ final class Openbay {
 			}
 		}
 
-		if (isset($order_voucher_query) && is_array($order_voucher_query)) {
+		if(isset($order_voucher_query) && is_array($order_voucher_query)) {
 			foreach ($order_voucher_query->rows as $voucher) {
 				$text .= '1x ' . $voucher['description'] . ' ' . $this->currency->format($voucher['amount'], $order_info['currency_code'], $order_info['currency_value']);
 			}
@@ -235,7 +284,7 @@ final class Openbay {
 		$text .= $language->get('text_new_order_total') . "\n";
 
 		foreach ($order_total_query->rows as $total) {
-			$text .= $total['title'] . ': ' . html_entity_decode($this->currency->format($total['value'], $order_info['currency_code'], $order_info['currency_value']), ENT_NOQUOTES, 'UTF-8') . "\n";
+			$text .= $total['title'] . ': ' . html_entity_decode($total['text'], ENT_NOQUOTES, 'UTF-8') . "\n";
 		}
 
 		$text .= "\n";
@@ -245,27 +294,26 @@ final class Openbay {
 			$text .= $order_info['comment'] . "\n\n";
 		}
 
-		$mail = new \Mail();
+		$mail = new Mail();
 		$mail->protocol = $this->config->get('config_mail_protocol');
 		$mail->parameter = $this->config->get('config_mail_parameter');
-		$mail->smtp_hostname = $this->config->get('config_mail_smtp_hostname');
-		$mail->smtp_username = $this->config->get('config_mail_smtp_username');
-		$mail->smtp_password = html_entity_decode($this->config->get('config_mail_smtp_password'), ENT_QUOTES, 'UTF-8');
-		$mail->smtp_port = $this->config->get('config_mail_smtp_port');
-		$mail->smtp_timeout = $this->config->get('config_mail_smtp_timeout');
-
+		$mail->hostname = $this->config->get('config_smtp_host');
+		$mail->username = $this->config->get('config_smtp_username');
+		$mail->password = $this->config->get('config_smtp_password');
+		$mail->port = $this->config->get('config_smtp_port');
+		$mail->timeout = $this->config->get('config_smtp_timeout');
 		$mail->setTo($this->config->get('config_email'));
 		$mail->setFrom($this->config->get('config_email'));
-		$mail->setSender(html_entity_decode($order_info['store_name'], ENT_QUOTES, 'UTF-8'));
-		$mail->setSubject($subject);
-		$mail->setText($text);
+		$mail->setSender($order_info['store_name']);
+		$mail->setSubject(html_entity_decode($subject, ENT_QUOTES, 'UTF-8'));
+		$mail->setText(html_entity_decode($text, ENT_QUOTES, 'UTF-8'));
 		$mail->send();
 
 		// Send to additional alert emails
-		$emails = explode(',', $this->config->get('config_mail_alert_email'));
+		$emails = explode(',', $this->config->get('config_alert_emails'));
 
 		foreach ($emails as $email) {
-			if ($email && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+			if ($email && preg_match('/^[^\@]+@.*.[a-z]{2,15}$/i', $email)) {
 				$mail->setTo($email);
 				$mail->send();
 			}
@@ -278,7 +326,7 @@ final class Openbay {
 		 * Use it to add stock back to the marketplaces
 		 */
 		foreach ($this->installed_markets as $market) {
-			if ($this->config->get($market . '_status') == 1 || $this->config->get('openbay_' .$market . '_status') == 1) {
+			if ($this->config->get($market . '_status') == 1) {
 				$this->{$market}->orderDelete($order_id);
 			}
 		}
@@ -286,31 +334,21 @@ final class Openbay {
 
 	public function getProductModelNumber($product_id, $sku = null) {
 		if($sku != null) {
-			$qry = $this->db->query("SELECT `sku` FROM `" . DB_PREFIX . "product_option_variant` WHERE `product_id` = '" . (int)$product_id . "' AND `sku` = '" . $this->db->escape($sku) . "'");
+			$qry = $this->db->query("SELECT `sku` FROM `" . DB_PREFIX . "product_option_relation` WHERE `product_id` = '" . (int)$product_id . "' AND `var` = '" . $this->db->escape($sku) . "'");
 
 			if($qry->num_rows > 0) {
 				return $qry->row['sku'];
-			} else {
+			}else{
 				return false;
 			}
-		} else {
+		}else{
 			$qry = $this->db->query("SELECT `model` FROM `" . DB_PREFIX . "product` WHERE `product_id` = '" . (int)$product_id . "' LIMIT 1");
 
 			if($qry->num_rows > 0) {
 				return $qry->row['model'];
-			} else {
+			}else{
 				return false;
 			}
-		}
-	}
-
-	public function getProductTaxClassId($product_id) {
-		$qry = $this->db->query("SELECT `tax_class_id` FROM `" . DB_PREFIX . "product` WHERE `product_id` = '" . (int)$product_id . "' LIMIT 1");
-
-		if($qry->num_rows > 0) {
-			return $qry->row['tax_class_id'];
-		} else {
-			return false;
 		}
 	}
 
@@ -335,7 +373,7 @@ final class Openbay {
 
 		if($qry->num_rows){
 			return $qry->row['customer_id'];
-		} else {
+		}else{
 			return false;
 		}
 	}
@@ -382,38 +420,12 @@ final class Openbay {
 					'option_id'         => $product_option['option_id'],
 					'name'              => $product_option['name'],
 					'type'              => $product_option['type'],
-					'option_value'      => $product_option['value'],
+					'option_value'      => $product_option['option_value'],
 					'required'          => $product_option['required']
 				);
 			}
 		}
 
 		return $product_option_data;
-	}
-
-	public function getOrderProducts($order_id) {
-		$order_products = $this->db->query("SELECT `product_id`, `order_product_id` FROM `" . DB_PREFIX . "order_product` WHERE `order_id` = '" . (int)$order_id . "'");
-
-		if($order_products->num_rows > 0) {
-			return $order_products->rows;
-		} else {
-			return array();
-		}
-	}
-
-	public function getOrderProductVariant($order_id, $product_id, $order_product_id) {
-		$this->load->model('extension/module/openstock');
-
-		$order_option_query = $this->db->query("SELECT * FROM " . DB_PREFIX . "order_option WHERE order_id = '" . (int)$order_id . "' AND order_product_id = '" . (int)$order_product_id . "'");
-
-		if ($order_option_query->num_rows) {
-			$options = array();
-
-			foreach ($order_option_query->rows as $option) {
-				$options[] = $option['product_option_value_id'];
-			}
-
-			return $this->model_extension_module_openstock->getVariantByOptionValues($options, $product_id);
-		}
 	}
 }

@@ -11,6 +11,10 @@ class ControllerCommonSearch extends Controller {
 			$data['search'] = '';
 		}
 
-		return $this->load->view('common/search', $data);
+		if (file_exists(DIR_TEMPLATE . $this->config->get('config_template') . '/template/common/search.tpl')) {
+			return $this->load->view($this->config->get('config_template') . '/template/common/search.tpl', $data);
+		} else {
+			return $this->load->view('default/template/common/search.tpl', $data);
+		}
 	}
 }

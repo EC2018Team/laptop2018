@@ -12,8 +12,6 @@ class ModelLocalisationStockStatus extends Model {
 		}
 
 		$this->cache->delete('stock_status');
-		
-		return $stock_status_id;
 	}
 
 	public function editStockStatus($stock_status_id, $data) {

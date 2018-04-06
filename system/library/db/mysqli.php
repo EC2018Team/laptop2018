@@ -1,23 +1,23 @@
 <?php
 namespace DB;
 final class MySQLi {
-	private $connection;
+	private $link;
 
-	public function __construct($hostname, $username, $password, $database, $port = '3306') {
-		$this->connection = new \mysqli($hostname, $username, $password, $database, $port);
+	public function __construct($hostname, $username, $password, $database) {
+		$this->link = new \mysqli($hostname, $username, $password, $database);
 
-		if ($this->connection->connect_error) {
-			throw new \Exception('Error: ' . $this->connection->error . '<br />Error No: ' . $this->connection->errno);
+		if ($this->link->connect_error) {
+			trigger_error('Error: Could not make a database link (' . $this->link->connect_errno . ') ' . $this->link->connect_error);
 		}
 
-		$this->connection->set_charset("utf8");
-		$this->connection->query("SET SQL_MODE = ''");
+		$this->link->set_charset("utf8");
+		$this->link->query("SET SQL_MODE = ''");
 	}
 
 	public function query($sql) {
-		$query = $this->connection->query($sql);
+		$query = $this->link->query($sql);
 
-		if (!$this->connection->errno) {
+		if (!$this->link->errno) {
 			if ($query instanceof \mysqli_result) {
 				$data = array();
 
@@ -37,27 +37,23 @@ final class MySQLi {
 				return true;
 			}
 		} else {
-			throw new \Exception('Error: ' . $this->connection->error  . '<br />Error No: ' . $this->connection->errno . '<br />' . $sql);
+			trigger_error('Error: ' . $this->link->error  . '<br />Error No: ' . $this->link->errno . '<br />' . $sql);
 		}
 	}
 
 	public function escape($value) {
-		return $this->connection->real_escape_string($value);
+		return $this->link->real_escape_string($value);
 	}
-	
+
 	public function countAffected() {
-		return $this->connection->affected_rows;
+		return $this->link->affected_rows;
 	}
 
 	public function getLastId() {
-		return $this->connection->insert_id;
+		return $this->link->insert_id;
 	}
-	
-	public function connected() {
-		return $this->connection->ping();
-	}
-	
+
 	public function __destruct() {
-		$this->connection->close();
+		$this->link->close();
 	}
 }

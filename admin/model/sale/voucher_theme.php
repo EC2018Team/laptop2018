@@ -10,8 +10,6 @@ class ModelSaleVoucherTheme extends Model {
 		}
 
 		$this->cache->delete('voucher_theme');
-		
-		return $voucher_theme_id;
 	}
 
 	public function editVoucherTheme($voucher_theme_id, $data) {

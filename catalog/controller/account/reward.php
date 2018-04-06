@@ -2,9 +2,9 @@
 class ControllerAccountReward extends Controller {
 	public function index() {
 		if (!$this->customer->isLogged()) {
-			$this->session->data['redirect'] = $this->url->link('account/reward', '', true);
+			$this->session->data['redirect'] = $this->url->link('account/reward', '', 'SSL');
 
-			$this->response->redirect($this->url->link('account/login', '', true));
+			$this->response->redirect($this->url->link('account/login', '', 'SSL'));
 		}
 
 		$this->load->language('account/reward');
@@ -20,15 +20,26 @@ class ControllerAccountReward extends Controller {
 
 		$data['breadcrumbs'][] = array(
 			'text' => $this->language->get('text_account'),
-			'href' => $this->url->link('account/account', '', true)
+			'href' => $this->url->link('account/account', '', 'SSL')
 		);
 
 		$data['breadcrumbs'][] = array(
 			'text' => $this->language->get('text_reward'),
-			'href' => $this->url->link('account/reward', '', true)
+			'href' => $this->url->link('account/reward', '', 'SSL')
 		);
 
 		$this->load->model('account/reward');
+
+		$data['heading_title'] = $this->language->get('heading_title');
+
+		$data['column_date_added'] = $this->language->get('column_date_added');
+		$data['column_description'] = $this->language->get('column_description');
+		$data['column_points'] = $this->language->get('column_points');
+
+		$data['text_total'] = $this->language->get('text_total');
+		$data['text_empty'] = $this->language->get('text_empty');
+
+		$data['button_continue'] = $this->language->get('button_continue');
 
 		if (isset($this->request->get['page'])) {
 			$page = $this->request->get['page'];
@@ -55,7 +66,7 @@ class ControllerAccountReward extends Controller {
 				'points'      => $result['points'],
 				'description' => $result['description'],
 				'date_added'  => date($this->language->get('date_format_short'), strtotime($result['date_added'])),
-				'href'        => $this->url->link('account/order/info', 'order_id=' . $result['order_id'], true)
+				'href'        => $this->url->link('account/order/info', 'order_id=' . $result['order_id'], 'SSL')
 			);
 		}
 
@@ -63,7 +74,7 @@ class ControllerAccountReward extends Controller {
 		$pagination->total = $reward_total;
 		$pagination->page = $page;
 		$pagination->limit = 10;
-		$pagination->url = $this->url->link('account/reward', 'page={page}', true);
+		$pagination->url = $this->url->link('account/reward', 'page={page}', 'SSL');
 
 		$data['pagination'] = $pagination->render();
 
@@ -71,7 +82,7 @@ class ControllerAccountReward extends Controller {
 
 		$data['total'] = (int)$this->customer->getRewardPoints();
 
-		$data['continue'] = $this->url->link('account/account', '', true);
+		$data['continue'] = $this->url->link('account/account', '', 'SSL');
 
 		$data['column_left'] = $this->load->controller('common/column_left');
 		$data['column_right'] = $this->load->controller('common/column_right');
@@ -80,6 +91,10 @@ class ControllerAccountReward extends Controller {
 		$data['footer'] = $this->load->controller('common/footer');
 		$data['header'] = $this->load->controller('common/header');
 
-		$this->response->setOutput($this->load->view('account/reward', $data));
+		if (file_exists(DIR_TEMPLATE . $this->config->get('config_template') . '/template/account/reward.tpl')) {
+			$this->response->setOutput($this->load->view($this->config->get('config_template') . '/template/account/reward.tpl', $data));
+		} else {
+			$this->response->setOutput($this->load->view('default/template/account/reward.tpl', $data));
+		}
 	}
 }
