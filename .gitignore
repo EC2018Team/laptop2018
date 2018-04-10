@@ -19,6 +19,9 @@ system/logs/*
 # cache
 system/upload/*
 !system/upload/index.html
+image/cache/*
+!image/cache/index.html
+
 
 # IDEs
 /.idea/
